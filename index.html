@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RTSPtoWEBPlayer demo</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous">
+    <script src="dist/RTSPtoWEBPlayer.js"></script>
+</head>
+<body>
+<div class="container">
+    <h2>RTSPtoWEBPlayer Example</h2>
+    <div class="row">
+        <div class="col-12">
+            <div id="player"></div>
+        </div>
+        <a class="btn btn-primary" onclick="play(0)">play RTSPtoWEB hls</a>
+        <a class="btn btn-primary" onclick="play(1)">play RTSPtoWEB mse</a>
+        <a class="btn btn-primary" onclick="play(2)">play RTSPtoWEB webrtc</a>
+    </div>
+</div>
+</body>
+<script>
+
+    const options={
+        parentElement: document.getElementById('player'),
+    };
+    const player=new RTSPtoWEBPlayer(options);
+
+    const play = (index=0)=>{
+        const link=[
+            'http://localhost:8083/stream/d4ee855e40874ef7b7149357a42f18f0/channel/0/hls/live/index.m3u8',
+            'ws://localhost:8083/stream/d4ee855e40874ef7b7149357a42f18f0/channel/0/mse?uuid=517fe9dbf4b244aaa0330cf582de9932&channel=0',
+            'http://localhost:8083/stream/d4ee855e40874ef7b7149357a42f18f0/channel/0/webrtc?uuid=517fe9dbf4b244aaa0330cf582de9932&channel=0',
+        ]
+        player.load(link[index]);
+    }
+</script>
+</html>

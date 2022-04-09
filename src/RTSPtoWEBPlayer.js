@@ -19,6 +19,7 @@ export default class RTSPtoWEBPlayer{
         controls:true,
         muted:true,
         autoplay:true,
+        loop:false,
         hlsjsconfig: {
 
         },
@@ -36,9 +37,10 @@ export default class RTSPtoWEBPlayer{
     createElements = ()=>{
         //video
         this.video=document.createElement("video");
-        this.video.setAttribute('controls',this.options.controls);
-        this.video.setAttribute('muted',this.options.muted);
-        this.video.setAttribute('autoplay',this.options.autoplay);
+        this.options.controls ? this.video.setAttribute('controls','') :0;
+        this.options.muted ? this.video.setAttribute('muted',''):0;
+        this.options.autoplay ? this.video.setAttribute('autoplay',''):0;
+        this.options.loop ? this.video.setAttribute('loop',''):0;
         //wrapper
         this.player=document.createElement("div");
         this.player.classList.add('RTSPtoWEBPlayer');
@@ -140,8 +142,8 @@ export default class RTSPtoWEBPlayer{
                 this.MSEStreamingStarted = false;
             }
         }
-
     }
+
     msePlayer =()=>{
         this.MSE = new MediaSource();
         this.video.src = window.URL.createObjectURL(this.MSE);
@@ -157,6 +159,7 @@ export default class RTSPtoWEBPlayer{
             this.hls.attachMedia(this.video);
         }
     }
+
     webRtcPlayer() {
         this.mediaStream = new MediaStream();
         this.webrtc = new RTCPeerConnection({
@@ -177,8 +180,10 @@ export default class RTSPtoWEBPlayer{
         const offer = await this.webrtc.createOffer();
         await this.webrtc.setLocalDescription(offer);
         const formData = new FormData();
+        const sourceType = new URL(this.options.source);
+        const suuid=(sourceType.pathname).split('/').at(-1);
         formData.append('data', btoa(this.webrtc.localDescription.sdp));
-
+        formData.append('suuid',suuid);
         const response=await  fetch(this.options.source, {
             method: 'POST',
             body: formData
@@ -198,6 +203,7 @@ export default class RTSPtoWEBPlayer{
         this.video.srcObject = this.mediaStream;
         this.video.play();
     }
+
     destroy=()=>{
         this.codec=null;
         if (this.currentPlayerType != null) {
@@ -226,8 +232,6 @@ export default class RTSPtoWEBPlayer{
                     this.webSocket.close(1000);
                     break;
                 default:
-
-
             }
             this.video.pause();
             this.video.removeAttribute('src'); // empty source

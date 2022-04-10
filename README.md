@@ -37,3 +37,42 @@ player.load('ws://localhost:8083/stream/517fe9dbf4b244aaa0330cf582de9932/channel
 ```
 
 ## Options
+```js
+options={
+        parentElement:null,
+        source:null,
+        controls:true,
+        muted:true,
+        autoplay:true,
+        loop:false,
+        hlsjsconfig: {
+
+        }
+    }
+```
+
+#### `parentElement`
+default: null
+
+HTMLElement
+#### `source`
+link to mediasource. requires explicit protocol http/https or ws/wss
+#### `controls`
+default: true
+
+show/hide notive video control
+#### `muted`
+default: true
+
+#### `autoplay`
+default: true
+
+#### `loop`
+default: false
+
+#### `hlsjsconfig`
+default: empty;
+
+full list of config  you can see on [API dicumentation hls.js](https://github.com/video-dev/hls.js/blob/master/docs/API.md#fine-tuning)
+## Methods
+

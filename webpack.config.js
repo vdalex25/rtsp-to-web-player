@@ -1,6 +1,6 @@
 module.exports = {
-    mode: 'development',//production,development
-    watch: true,
+    mode: 'production',//production,development
+    watch: false,
     target: 'web',
     entry: {
         RTSPtoWEBPlayer:"./src/rtsp-to-web-player.js"

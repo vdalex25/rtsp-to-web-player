@@ -9,6 +9,7 @@
 
 there is no GUI in this project, you can add your own GUI
 
+[demo page](http://htmlpreview.github.io/?https://github.com/vdalex25/rtsp-to-web-player/blob/main/index.html)
 ## Install
 
 ```bash

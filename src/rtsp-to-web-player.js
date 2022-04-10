@@ -63,6 +63,9 @@ export default class RTSPtoWEBPlayer{
             if (this.options.source.indexOf('m3u8') !== -1) {
                 this.currentPlayerType = "hls";
                 this.hlsPlayer();
+            }else if(this.options.source.indexOf('.mp4') !== -1){
+                this.currentPlayerType = "mp4";
+                this.mp4Player();
             } else {
                 this.currentPlayerType = "rtc";
                 this.webRtcPlayer();
@@ -144,6 +147,10 @@ export default class RTSPtoWEBPlayer{
         }
     }
 
+    mp4Player=()=>{
+        this.video.src=this.options.source;
+    }
+
     msePlayer =()=>{
         this.MSE = new MediaSource();
         this.video.src = window.URL.createObjectURL(this.MSE);
@@ -157,6 +164,8 @@ export default class RTSPtoWEBPlayer{
             this.hls = new Hls(this.options.hlsjsconfig);
             this.hls.loadSource(this.options.source);
             this.hls.attachMedia(this.video);
+        }else{
+            console.warn('UNSUPPOERED MEDIA SOURCE');
         }
     }
 
@@ -179,9 +188,8 @@ export default class RTSPtoWEBPlayer{
      handleNegotiationNeeded = async ()=>{
         const offer = await this.webrtc.createOffer();
         await this.webrtc.setLocalDescription(offer);
+        const suuid=((new URL(this.options.source)).pathname).split('/').at(-1);
         const formData = new FormData();
-        const sourceType = new URL(this.options.source);
-        const suuid=(sourceType.pathname).split('/').at(-1);
         formData.append('data', btoa(this.webrtc.localDescription.sdp));
         formData.append('suuid',suuid);
         const response=await  fetch(this.options.source, {

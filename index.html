@@ -18,6 +18,7 @@
         <a class="btn btn-primary" onclick="play(0)">play RTSPtoWEB hls</a>
         <a class="btn btn-primary" onclick="play(1)">play RTSPtoWEB mse</a>
         <a class="btn btn-primary" onclick="play(2)">play RTSPtoWEB webrtc</a>
+        <a class="btn btn-primary" onclick="play(3)">play RTSPtoWebRTC webrtc</a>
     </div>
 </div>
 </body>
@@ -25,14 +26,20 @@
 
     const options={
         parentElement: document.getElementById('player'),
+        source: 'ws://localhost:8083/stream/d4ee855e40874ef7b7149357a42f18f0/channel/0/mse?uuid=d4ee855e40874ef7b7149357a42f18f0&channel=0',
+        controls:false,
+        hlsjsconfig: {
+            debug:true
+        }
+
     };
     const player=new RTSPtoWEBPlayer(options);
-
     const play = (index=0)=>{
         const link=[
             'http://localhost:8083/stream/d4ee855e40874ef7b7149357a42f18f0/channel/0/hls/live/index.m3u8',
-            'ws://localhost:8083/stream/d4ee855e40874ef7b7149357a42f18f0/channel/0/mse?uuid=517fe9dbf4b244aaa0330cf582de9932&channel=0',
+            'ws://localhost:8083/stream/d4ee855e40874ef7b7149357a42f18f0/channel/0/mse?uuid=d4ee855e40874ef7b7149357a42f18f0&channel=0',
             'http://localhost:8083/stream/d4ee855e40874ef7b7149357a42f18f0/channel/0/webrtc?uuid=517fe9dbf4b244aaa0330cf582de9932&channel=0',
+            'http://localhost:8083/stream/receiver/H264_AAC'
         ]
         player.load(link[index]);
     }

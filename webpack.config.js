@@ -3,7 +3,7 @@ module.exports = {
     watch: true,
     target: 'web',
     entry: {
-        RTSPtoWEBPlayer:"./src/RTSPtoWEBPlayer.js"
+        RTSPtoWEBPlayer:"./src/rtsp-to-web-player.js"
     },
     output: {
         path:__dirname+'/dist',

@@ -1,6 +1,6 @@
 import 'webrtc-adapter';
 import Hls from 'hls.js/dist/hls.light.min.js';
-import './RTSPtoWEBPlayer.css';
+import './rtsp-to-web-player.css';
 
 export default class RTSPtoWEBPlayer{
 

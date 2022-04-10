@@ -9,14 +9,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vdalex25/RTSPtoWEBPlayer.git"
+    "url": "git+https://github.com/vdalex25/rtsp-to-web-player.git"
   },
   "author": "vdalex",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/vdalex25/RTSPtoWEBPlayer/issues"
+    "url": "https://github.com/vdalex25/rtsp-to-web-player/issues"
   },
-  "homepage": "https://github.com/vdalex25/RTSPtoWEBPlayer#readme",
+  "homepage": "https://github.com/vdalex25/rtsp-to-web-player#readme",
   "devDependencies": {
     "@babel/cli": "^7.0.0-beta.40",
     "@babel/core": "^7.0.0-beta.40",
@@ -34,7 +34,6 @@
     "webrtc-adapter": "^8.1.0"
   },
   "dependencies": {
-    "@babel/eslint-parser": "^7.17.0",
-    "babel-eslint": "^10.1.0"
+    "@babel/eslint-parser": "^7.17.0"
   }
 }

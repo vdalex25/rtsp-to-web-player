@@ -18,7 +18,7 @@ cd RTSPtoWEBPlayer
 
 npm install
 
-webpack build
+npm run build
 ```
 it's created compiled file `dist/RTSPtoWEBPlayer.js`
 ## Usage
@@ -31,7 +31,6 @@ Create new player
 const options={
     parentElement: document.getElementById('player')
 };
-
 const player=new RTSPtoWEBPlayer(options);
 player.load('ws://localhost:8083/stream/517fe9dbf4b244aaa0330cf582de9932/channel/0/mse?uuid=517fe9dbf4b244aaa0330cf582de9932&channel=0');
 ```

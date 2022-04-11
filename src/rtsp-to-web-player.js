@@ -238,6 +238,7 @@ export default class RTSPtoWEBPlayer{
                     this.webSocket.onmessage = null;
                     this.webSocket.onclose = null;
                     this.webSocket.close(1000);
+                    this.turn=[];
                     break;
                 default:
             }

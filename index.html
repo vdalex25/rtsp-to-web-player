@@ -14,7 +14,8 @@
     <div class="row">
         <div class="col-12">
             <div class="input-group mb-3">
-                <input type="text" class="form-control" placeholder="url link" id="link">
+                <input type="text" class="form-control" placeholder="url link" id="link"
+                value="http://171.25.233.50/v1/live/hls/stream/test/input/camera1/adaptive/master.m3u8">
                 <button class="btn btn-outline-secondary" type="button" onclick="play()">PLAY</button>
             </div>
         </div>
@@ -32,9 +33,23 @@
     const player=new RTSPtoWEBPlayer(options);
     const play = ()=>{
         const link=document.getElementById("link").value;
+        const url=new URL(window.location.href);
         if(link!=''){
             player.load(link);
+            window.history.pushState('RTSPtoWEBPlayer', 'RTSPtoWEBPlayer',`${url.origin+url.pathname+url.search}#${link}`);
         }
+    }
+
+    if(window.location.hash){
+        console.log(window.location.hash.substr(1));
+        try{
+            const href=new URL(window.location.hash.substr(1));
+            document.getElementById("link").value=window.location.hash.substr(1);
+            play();
+        }catch (e){
+            console.log(e);
+        }
+
     }
 </script>
 </html>

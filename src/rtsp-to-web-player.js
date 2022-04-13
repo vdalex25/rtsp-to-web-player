@@ -114,7 +114,8 @@ export default class RTSPtoWEBPlayer{
                     this.codec=data;
                 }
                 this.MSESourceBuffer = this.MSE.addSourceBuffer(`video/mp4; codecs="${this.codec}"`);
-                this.MSESourceBuffer.mode = "segments"
+                this.MSESourceBuffer.mode = "segments";
+                this.MSESourceBuffer.addEventListener("updateend", this.pushPacket);
             }else{
                 this.readPacket(data);
             }

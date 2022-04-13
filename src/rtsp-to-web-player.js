@@ -23,6 +23,14 @@ export default class RTSPtoWEBPlayer{
         hlsjsconfig: {
 
         },
+        webrtcconfig:{
+            iceServers: [{
+                urls: ["stun:stun.l.google.com:19302"]
+            }],
+            sdpSemantics: "unified-plan",
+            bundlePolicy: 'max-compat'
+
+        }
     }
 
     constructor(options) {
@@ -106,6 +114,7 @@ export default class RTSPtoWEBPlayer{
                     this.codec=data;
                 }
                 this.MSESourceBuffer = this.MSE.addSourceBuffer(`video/mp4; codecs="${this.codec}"`);
+                this.MSESourceBuffer.mode = "segments"
             }else{
                 this.readPacket(data);
             }
@@ -171,12 +180,7 @@ export default class RTSPtoWEBPlayer{
 
     webRtcPlayer() {
         this.mediaStream = new MediaStream();
-        this.webrtc = new RTCPeerConnection({
-            iceServers: [{
-                urls: ["stun:stun.l.google.com:19302"]
-            }],
-            sdpSemantics: "unified-plan"
-        });
+        this.webrtc = new RTCPeerConnection(this.options.webrtcconfig);
         this.webrtc.onnegotiationneeded = this.handleNegotiationNeeded;
 
         this.webrtc.addTransceiver('video', {
@@ -188,7 +192,7 @@ export default class RTSPtoWEBPlayer{
      handleNegotiationNeeded = async ()=>{
         const offer = await this.webrtc.createOffer();
         await this.webrtc.setLocalDescription(offer);
-        const suuid=((new URL(this.options.source)).pathname).split('/').at(-1);
+        const suuid=((new URL(this.options.source)).pathname).split('/').slice(-1);
         const formData = new FormData();
         formData.append('data', btoa(this.webrtc.localDescription.sdp));
         formData.append('suuid',suuid);

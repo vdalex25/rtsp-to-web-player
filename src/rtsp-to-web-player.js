@@ -13,6 +13,7 @@ export default class RTSPtoWEBPlayer{
     webrtc=null;
     currentPlayerType=null;
     hidden = "hidden";
+    paused=false;
     options={
         parentElement:null,
         source:null,
@@ -24,13 +25,12 @@ export default class RTSPtoWEBPlayer{
 
         },
         webrtcconfig:{
-            iceServers: [{
-                urls: ["stun:stun.l.google.com:19302"]
-            }],
+            iceServers: [{urls: ["stun:stun.l.google.com:19302"]}],
             sdpSemantics: "unified-plan",
-            bundlePolicy: 'max-compat'
-
-        }
+            bundlePolicy: "max-compat",
+            iceTransportPolicy: "all",//for option "relay" need use  turn server
+        },
+        debug:false
     }
 
     constructor(options) {
@@ -49,6 +49,7 @@ export default class RTSPtoWEBPlayer{
         this.options.muted ? this.video.setAttribute('muted',''):0;
         this.options.autoplay ? this.video.setAttribute('autoplay',''):0;
         this.options.loop ? this.video.setAttribute('loop',''):0;
+        this.addVideoListeners();
         //wrapper
         this.player=document.createElement("div");
         this.player.classList.add('RTSPtoWEBPlayer');
@@ -87,7 +88,7 @@ export default class RTSPtoWEBPlayer{
 
     }
 
-    addListeners = () => {
+    addMseListeners = () => {
         this.MSE.addEventListener('sourceopen', this.sourceOpenHandler);
     }
 
@@ -98,15 +99,10 @@ export default class RTSPtoWEBPlayer{
     websocketEvents=()=>{
         this.webSocket = new WebSocket(this.options.source);
         this.webSocket.binaryType = "arraybuffer";
-        this.webSocket.onopen = () => {
-
-        }
         this.webSocket.onclose = () => {
             this.webSocket.onmessage=null;
         }
-
         this.webSocket.onmessage =  ({data}) => {
-
             if(this.codec===null){
                 if(typeof (data)==="object"){
                     this.codec=new TextDecoder("utf-8").decode((new Uint8Array(data)).slice(1));
@@ -117,7 +113,9 @@ export default class RTSPtoWEBPlayer{
                 this.MSESourceBuffer.mode = "segments";
                 this.MSESourceBuffer.addEventListener("updateend", this.pushPacket);
             }else{
-                this.readPacket(data);
+                if(!this.paused){
+                    this.readPacket(data);
+                }
             }
             if (document[this.hidden] && this.video.buffered.length) {
                 this.video.currentTime = this.video.buffered.end((this.video.buffered.length - 1)) - 1;
@@ -136,10 +134,7 @@ export default class RTSPtoWEBPlayer{
             return;
         }
         this.turn.push(packet);
-
-        if (!this.MSESourceBuffer.updating) {
-            this.pushPacket();
-        }
+        this.pushPacket();
     }
 
     pushPacket = () => {
@@ -148,8 +143,8 @@ export default class RTSPtoWEBPlayer{
                 const packet = this.turn.shift();
                 try {
                     this.MSESourceBuffer.appendBuffer(packet)
-                } catch (e) {
-                    console.log(e);
+                } catch (err) {
+                    this.debugLogger(err);
                 }
             } else {
                 this.MSEStreamingStarted = false;
@@ -164,7 +159,7 @@ export default class RTSPtoWEBPlayer{
     msePlayer =()=>{
         this.MSE = new MediaSource();
         this.video.src = window.URL.createObjectURL(this.MSE);
-        this.addListeners();
+        this.addMseListeners();
     }
 
     hlsPlayer = ()=>{
@@ -179,49 +174,127 @@ export default class RTSPtoWEBPlayer{
         }
     }
 
-    webRtcPlayer() {
+    webRtcPlayer= async ()=>{
         this.mediaStream = new MediaStream();
+        this.video.srcObject = this.mediaStream;
         this.webrtc = new RTCPeerConnection(this.options.webrtcconfig);
-        this.webrtc.onnegotiationneeded = this.handleNegotiationNeeded;
-
-        this.webrtc.addTransceiver('video', {
-            'direction': 'sendrecv'
-        });
+        this.webrtc.onnegotiationneeded         =this.handleNegotiationNeeded;
+        this.webrtc.onsignalingstatechange      =this.signalingstatechange;
+        this.webrtc.onicegatheringstatechange   =this.icegatheringstatechange;
+        this.webrtc.onicecandidate              =this.icecandidate;
+        this.webrtc.onicecandidateerror         =this.icecandidateerror;
+        this.webrtc.onconnectionstatechange     =this.connectionstatechange;
+        this.webrtc.oniceconnectionstatechange  =this.iceconnectionstatechange;
         this.webrtc.ontrack = this.onTrack;
+
+        const offer = await this.webrtc.createOffer({
+            //iceRestart:true,
+            offerToReceiveAudio:true,
+            offerToReceiveVideo:true
+        });
+        await this.webrtc.setLocalDescription(offer);
     }
 
-     handleNegotiationNeeded = async ()=>{
-        const offer = await this.webrtc.createOffer();
-        await this.webrtc.setLocalDescription(offer);
-        const suuid=((new URL(this.options.source)).pathname).split('/').slice(-1);
-        const formData = new FormData();
-        formData.append('data', btoa(this.webrtc.localDescription.sdp));
-        formData.append('suuid',suuid);
-        const response=await  fetch(this.options.source, {
-            method: 'POST',
-            body: formData
-        });
-        if(response.ok){
-            const remoteDescription=await response.text();
-            this.webrtc.setRemoteDescription(new RTCSessionDescription({
-                                type: 'answer',
-                                sdp: atob(remoteDescription)
-                            }))
-        }
+    handleNegotiationNeeded = async ()=>{
+        /*
+        * in this project this handler is not needed, but in another it can be useful
+        */
+        this.debugLogger('handleNegotiationNeeded')
+    }
 
+    signalingstatechange = async ()=>{
+        switch (this.webrtc.signalingState){
+            case 'have-local-offer':
+                const suuid=((new URL(this.options.source)).pathname).split('/').slice(-1);
+                const formData = new FormData();
+                formData.append('data', btoa(this.webrtc.localDescription.sdp));
+                formData.append('suuid',suuid);
+                const response=await  fetch(this.options.source, {
+                    method: 'POST',
+                    body: formData
+                });
+                if(response.ok){
+                    const remoteDescription=await response.text();
+                    this.webrtc.setRemoteDescription(new RTCSessionDescription({
+                        type: 'answer',
+                        sdp: atob(remoteDescription)
+                    }))
+                }
+                break;
+            case 'stable':
+                /*
+                * There is no ongoing exchange of offer and answer underway.
+                * This may mean that the RTCPeerConnection object is new, in which case both the localDescription and remoteDescription are null;
+                * it may also mean that negotiation is complete and a connection has been established.
+                */
+                break;
+
+            case 'closed':
+                /*
+                 * The RTCPeerConnection has been closed.
+                 */
+                this.destroy();
+                break;
+
+            default:
+                console.log(`unhandled signalingState is ${this.webrtc.signalingState}`);
+                break;
+        }
+    }
+
+    icegatheringstatechange =()=>{
+        switch(this.webrtc.iceGatheringState) {
+            case "gathering":
+                /* collection of candidates has begun */
+                this.debugLogger('collection of candidates has begun');
+                break;
+            case "complete":
+                /* collection of candidates is finished */
+                this.debugLogger('collection of candidates is finished');
+                break;
+        }
+    }
+
+    icecandidate = (event)=>{
+        this.debugLogger('icecandidate\n',event.candidate)
+    }
+
+    icecandidateerror=(event)=>{
+        this.debugLogger('icecandidateerror\n',`hostCandidate: ${event.hostCandidate} CODE: ${event.errorCode} TEXT: ${event.errorText}`);
+    }
+
+    connectionstatechange=()=>{
+        switch(this.webrtc.connectionState) {
+            case "new":
+            case "connected":
+                this.debugLogger("Online");
+                break;
+            case "disconnected":
+                this.debugLogger("Disconnecting...");
+                break;
+            case "closed":
+                this.debugLogger("Offline");
+                break;
+            case "failed":
+                this.debugLogger("Error");
+                break;
+            default:
+                this.debugLogger(`Unhadled state: ${this.webrtc.connectionState}`);
+                break;
+        }
+    }
+    iceconnectionstatechange=()=>{
+        //this.debugLogger('iceconnectionstatechange\n',this.webrtc.iceConnectionState);
     }
 
     onTrack=(event)=>{
         this.mediaStream.addTrack(event.track);
-        this.video.srcObject = this.mediaStream;
-        this.video.play();
     }
 
     destroy=()=>{
         this.codec=null;
         if (this.currentPlayerType != null) {
             switch (this.currentPlayerType) {
-
                 case 'hls':
                     if (this.hls != null) {
                         this.hls.destroy();
@@ -253,6 +326,30 @@ export default class RTSPtoWEBPlayer{
         }
     }
 
+    addVideoListeners=()=>{
+
+        this.video.addEventListener('error', (e) => {
+            this.debugLogger('[ video listener ]',e)
+            this.destroy();
+        });
+
+        this.video.addEventListener('play', () => {
+            this.paused=false
+        });
+
+        this.video.addEventListener('pause', () => {
+            this.paused=true;
+        });//
+
+        this.video.addEventListener('progress', () => {
+            if(this.currentPlayerType === 'ws' && this.video.buffered.length>0){
+                if(this.video.currentTime<this.video.buffered.start(this.video.buffered.length-1)){
+                    this.video.currentTime=this.video.buffered.end(this.video.buffered.length-1)-1;
+                }
+            }
+        });
+    }
+
     defDocumentHidden() {
         if (typeof document.hidden !== "undefined") {
             this.hidden = "hidden";
@@ -262,6 +359,29 @@ export default class RTSPtoWEBPlayer{
             this.hidden = "webkitHidden";
         }
     }
+
+    getImageBase64 = ()=>{
+        const canvas = document.createElement("canvas");
+        canvas.width = this.video.videoWidth;
+        canvas.height = this.video.videoHeight;
+        canvas.getContext('2d').drawImage(this.video, 0, 0, canvas.width, canvas.height);
+        const dataURL = canvas.toDataURL();
+        canvas.remove();
+        return dataURL;
+    }
+
+    debugLogger=(...arg)=>{
+        if(this.options.debug){
+            if(this.options.debug==='trace'){
+                console.trace(...arg)
+            }else{
+                console.log(...arg)
+            }
+
+        }
+    }
+
+
 }
 
 

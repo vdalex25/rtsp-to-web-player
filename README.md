@@ -3,7 +3,6 @@
 - [RTSPtoWeb](https://github.com/deepch/RTSPtoWeb)
 - [RTSPtoWebRTC](https://github.com/deepch/RTSPtoWebRTC)
 - [RTSPtoWSMP4f](https://github.com/deepch/RTSPtoWSMP4f)
-- [RTSPtoImage](https://github.com/deepch/RTSPtoImage)
 - [RTSPtoHLS](https://github.com/deepch/RTSPtoHLS)
 - [RTSPtoHLSLL](https://github.com/deepch/RTSPtoHLSLL)
 
@@ -74,5 +73,74 @@ default: false
 default: empty;
 
 full list of config  you can see on [API dicumentation hls.js](https://github.com/video-dev/hls.js/blob/master/docs/API.md#fine-tuning)
-## Methods
 
+#### `webrtcconfig`
+default: 
+```js
+{
+iceServers: [{
+    urls: [
+        "stun:stun.l.google.com:19302"
+    ]}
+],
+sdpSemantics: "unified-plan",
+bundlePolicy: "max-compat",
+iceTransportPolicy: "all"//for option "relay" need use  turn server
+}
+```
+full list of config  you can see on [RTCPeerConnection](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/RTCPeerConnection#parameters)
+## Methods
+#### `load(source)`
+breaking previos connections and load new source
+```js
+const server='127.0.0.1:8083';//server and port where is running one of mediaserver
+const uuid='test';//stream uuid
+const channel=0;//stream channel optional
+
+//Project RTSPtoWeb[MSE]
+const source=`ws://${server}/stream/${uuid}/channel/${channel}/mse?uuid=${uuid}/&channel=${channel}`;
+//Project RTSPtoWeb[WEBRTC]
+const source=`http://${server}/stream/${uuid}/channel/${channel}/webrtc?uuid=${uuid}/&channel=${channel}`;
+//Project RTSPtoWeb[HLS]
+const source=`http://${server}/stream/${uuid}/channel/${channel}/hls/live/index.m3u8`;
+//Project RTSPtoWeb[HLSLL]
+const source=`http://${server}/stream/${uuid}/channel/${channel}/hlsll/live/index.m3u8`;
+
+//Project RTSPtoWebRTC[WEBRTC]
+const source=`http://${server}/stream/receiver/${uuid}`;
+
+//Project RTSPtoWSMP4f[MSE]
+const source=`ws://${server}/ws/live?suuid=${uuid}`;
+
+//Project RTSPtoHLS[HLS]
+const source=`http://${server}/play/hls/${uuid}/index.m3u8`;
+
+//Project RTSPtoHLSLL[HLS]
+const source=`http://${server}/play/hls/${uuid}/index.m3u8`;
+
+player.load(source);
+```
+
+#### `destroy()`
+breaks all active connections and destroys the player
+
+#### `control media`
+for player control you can use all methods for video tag [HTMLMediaElement](https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement#methods)  over player.video
+
+for example 
+```js
+const player=new RTSPtoWEBPlayer({
+    parentElement: document.getElementById('player')
+});
+player.load(source_url);
+
+//pause
+player.video.pause();
+//play
+player.video.play();
+//get currentTime
+console.log(player.video.currentTime);
+//set currentTime
+player.video.currentTime=10;
+//etc
+```

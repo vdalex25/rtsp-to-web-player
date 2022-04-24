@@ -10,14 +10,15 @@
 </head>
 <body>
 <div class="container">
-    <h2>RTSPtoWEBPlayer Example</h2>
+    <h2 class="text-center mt-3">RTSPtoWEBPlayer Example</h2>
     <div class="row">
         <div class="col-12">
             <div class="input-group mb-3">
                 <input type="text" class="form-control" placeholder="url link" id="link"
-                value="">
+                value="https://sr232.ipeye.ru/webrtc/23875e82948a473b83bcd7d0d493fd8f/channel/0/webrtc?uuid=23875e82948a473b83bcd7d0d493fd8f&channel=0"/>
                 <button class="btn btn-outline-secondary" type="button" onclick="play()">PLAY</button>
             </div>
+            <h6 class="text-center mb-3"><small><a href="#" id="outerLink"></a></small></h6>
         </div>
         <div class="col-12">
             <div id="player"></div>
@@ -34,14 +35,14 @@
     const play = ()=>{
         const link=document.getElementById("link").value;
         const url=new URL(window.location.href);
-        if(link!=''){
+        if(link!==''){
             player.load(link);
-            window.history.pushState('RTSPtoWEBPlayer', 'RTSPtoWEBPlayer',`${url.origin+url.pathname+url.search}#${link}`);
+            outerLink.innerHTML=`${url.origin+url.pathname+url.search}#${link}`;
+            outerLink.setAttribute('href',`${url.origin+url.pathname+url.search}#${link}`)
         }
     }
 
     if(window.location.hash){
-        console.log(window.location.hash.substr(1));
         try{
             const href=new URL(window.location.hash.substr(1));
             document.getElementById("link").value=window.location.hash.substr(1);

@@ -1,6 +1,6 @@
 {
   "name": "rtsptowebplayer",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "js player for RTSPtoWEB",
   "main": "./src/RTSPtoWEBPlayer.js",
   "scripts": {

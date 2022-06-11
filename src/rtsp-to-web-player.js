@@ -25,10 +25,12 @@ export default class RTSPtoWEBPlayer{
 
         },
         webrtcconfig:{
-            iceServers: [{urls: ["stun:stun.l.google.com:19302"]}],
+            iceServers: [
+                {urls: ["stun:stun.l.google.com:19302"]}
+                ],
             sdpSemantics: "unified-plan",
             bundlePolicy: "max-compat",
-            iceTransportPolicy: "all",//for option "relay" need use  turn server
+            //iceTransportPolicy: "relay",//for option "relay" need use  turn server
         },
         debug:false
     }
@@ -45,6 +47,7 @@ export default class RTSPtoWEBPlayer{
     createElements = ()=>{
         //video
         this.video=document.createElement("video");
+        this.video.setAttribute('playsinline','')
         this.options.controls ? this.video.setAttribute('controls','') :0;
         this.options.muted ? this.video.setAttribute('muted',''):0;
         this.options.autoplay ? this.video.setAttribute('autoplay',''):0;
@@ -56,7 +59,8 @@ export default class RTSPtoWEBPlayer{
         this.player.append(this.video);
     }
 
-    attachTo=()=>{
+    attachTo=(element)=>{
+        this.options.parentElement=element
         this.options.parentElement.innerHTML="";
         this.options.parentElement.append(this.player);
         if(this.options.source){
@@ -256,7 +260,10 @@ export default class RTSPtoWEBPlayer{
     }
 
     icecandidate = (event)=>{
-        this.debugLogger('icecandidate\n',event.candidate)
+        if(!event.candidate){
+            //send to signal
+            //let candidate=new RTCIceCandidate(event.candidate);
+        }
     }
 
     icecandidateerror=(event)=>{
@@ -267,10 +274,10 @@ export default class RTSPtoWEBPlayer{
         switch(this.webrtc.connectionState) {
             case "new":
             case "connected":
-                this.debugLogger("Online");
+                this.debugLogger("connected");
                 break;
             case "disconnected":
-                this.debugLogger("Disconnecting...");
+                this.debugLogger("disconnected...");
                 break;
             case "closed":
                 this.debugLogger("Offline");
@@ -284,10 +291,11 @@ export default class RTSPtoWEBPlayer{
         }
     }
     iceconnectionstatechange=()=>{
-        //this.debugLogger('iceconnectionstatechange\n',this.webrtc.iceConnectionState);
+        this.debugLogger('iceconnectionstatechange\n',this.webrtc.iceConnectionState);
     }
 
     onTrack=(event)=>{
+        this.debugLogger('onTrack\n',this.webrtc.iceConnectionState);
         this.mediaStream.addTrack(event.track);
     }
 

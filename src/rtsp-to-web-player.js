@@ -47,11 +47,12 @@ export default class RTSPtoWEBPlayer{
     createElements = ()=>{
         //video
         this.video=document.createElement("video");
-        this.video.setAttribute('playsinline','')
-        this.options.controls ? this.video.setAttribute('controls','') :0;
-        this.options.muted ? this.video.setAttribute('muted',''):0;
-        this.options.autoplay ? this.video.setAttribute('autoplay',''):0;
-        this.options.loop ? this.video.setAttribute('loop',''):0;
+        this.video.setAttribute('playsinline','');
+        this.video.muted = this.options.muted ? true : false;
+        this.video.controls = this.options.controls ? true : false;
+        this.video.autoplay = this.options.autoplay ? true : false;
+        this.video.loop = this.options.loop ? true : false;
+
         this.addVideoListeners();
         //wrapper
         this.player=document.createElement("div");
@@ -260,9 +261,11 @@ export default class RTSPtoWEBPlayer{
     }
 
     icecandidate = (event)=>{
+        this.debugLogger('icecandidate\n',event);
         if(!event.candidate){
             //send to signal
             //let candidate=new RTCIceCandidate(event.candidate);
+
         }
     }
 
@@ -383,7 +386,7 @@ export default class RTSPtoWEBPlayer{
             if(this.options.debug==='trace'){
                 console.trace(...arg)
             }else{
-                console.log(...arg)
+                console.log(new Date().toLocaleTimeString(),...arg)
             }
 
         }

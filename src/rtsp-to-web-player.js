@@ -2,52 +2,55 @@ import 'webrtc-adapter';
 import Hls from 'hls.js/dist/hls.light.min.js';
 import './rtsp-to-web-player.css';
 
-export default class RTSPtoWEBPlayer{
+export default class RTSPtoWEBPlayer {
 
-    MSE=null;
-    MSEStreamingStarted=false;
-    MSESourceBuffer=null;
-    turn=[];
-    codec=null;
-    webSocket=null;
-    webrtc=null;
-    currentPlayerType=null;
+    MSE = null;
+    MSEStreamingStarted = false;
+    MSESourceBuffer = null;
+    turn = [];
+    codec = null;
+    webSocket = null;
+    webrtc = null;
+    currentPlayerType = null;
     hidden = "hidden";
-    paused=false;
-    options={
-        parentElement:null,
-        source:null,
-        controls:true,
-        muted:true,
-        autoplay:true,
-        loop:false,
-        hlsjsconfig: {
-
-        },
-        webrtcconfig:{
-            iceServers: [
-                {urls: ["stun:stun.l.google.com:19302"]}
-                ],
+    paused = false;
+    presets = null;
+    audio_tracks=null;
+    switchFlag=false;
+    options = {
+        parentElement: null,
+        source: null,
+        controls: true,
+        muted: true,
+        autoplay: true,
+        loop: false,
+        hlsjsconfig: {},
+        webrtcconfig: {
+            iceServers: [{urls: ["stun:stun.l.google.com:19302"]}],
             sdpSemantics: "unified-plan",
             bundlePolicy: "max-compat",
             //iceTransportPolicy: "relay",//for option "relay" need use  turn server
         },
-        debug:false
+        debug: false,
+        getPresets:null,
+        onResolutionChange:null,
+        latency: null
     }
 
+
     constructor(options) {
-        this.options={...this.options,...options};
+        this.options = {...this.options, ...options};
         this.createElements();
-        if(this.options.parentElement){
+        if (this.options.parentElement) {
             this.attachTo(this.options.parentElement);
         }
         this.defDocumentHidden();
     }
 
-    createElements = ()=>{
+    createElements = () => {
         //video
-        this.video=document.createElement("video");
-        this.video.setAttribute('playsinline','');
+        this.video = document.createElement("video");
+        this.video.setAttribute('playsinline', '');
         this.video.muted = this.options.muted ? true : false;
         this.video.controls = this.options.controls ? true : false;
         this.video.autoplay = this.options.autoplay ? true : false;
@@ -55,29 +58,29 @@ export default class RTSPtoWEBPlayer{
 
         this.addVideoListeners();
         //wrapper
-        this.player=document.createElement("div");
+        this.player = document.createElement("div");
         this.player.classList.add('RTSPtoWEBPlayer');
         this.player.append(this.video);
     }
 
-    attachTo=(element)=>{
-        this.options.parentElement=element
-        this.options.parentElement.innerHTML="";
+    attachTo = (element) => {
+        this.options.parentElement = element
+        this.options.parentElement.innerHTML = "";
         this.options.parentElement.append(this.player);
-        if(this.options.source){
+        if (this.options.source) {
             this.load(this.options.source);
         }
     }
 
-    load = (source)=>{
-        this.options.source=source;
+    load = (source) => {
+        this.options.source = source;
         this.destroy();
         const sourceType = new URL(this.options.source);
         if (sourceType.protocol === 'http:' || sourceType.protocol === 'https:') {
             if (this.options.source.indexOf('m3u8') !== -1) {
                 this.currentPlayerType = "hls";
                 this.hlsPlayer();
-            }else if(this.options.source.indexOf('.mp4') !== -1){
+            } else if (this.options.source.indexOf('.mp4') !== -1) {
                 this.currentPlayerType = "mp4";
                 this.mp4Player();
             } else {
@@ -85,40 +88,142 @@ export default class RTSPtoWEBPlayer{
                 this.webRtcPlayer();
             }
         } else if (sourceType.protocol === 'ws:' || sourceType.protocol === 'wss:') {
-            this.currentPlayerType = "ws";
-            this.msePlayer();
+            if (this.options.source.indexOf('on-air') !== -1 || this.options.source.indexOf('preview')) {
+                this.currentPlayerType = "ws-new";
+                this.newMsePlayer();
+
+            } else {
+                this.currentPlayerType = "ws";
+                this.msePlayer();
+            }
+
         } else {
             this.currentPlayerType = null;
         }
 
     }
 
+    newMsePlayer = () => {
+
+        this.webSocket = new WebSocket(this.options.source);
+        this.webSocket.onopen = () => {
+            //console.log('opened')
+        }
+        this.webSocket.onclose = (e) => {
+            console.log(e)
+        }
+
+        this.webSocket.onmessage = ({data}) => {
+            this.messageHandler(data)
+        }
+    }
+
+    messageHandler = (data) => {
+
+        if (typeof data === 'string') {
+            try {
+                data = JSON.parse(data);
+                if (data.method === 'play_response') {
+                    this.presets = data.payload.streams
+                    if (typeof this.options.getPresets === 'function') {
+                        this.options.getPresets(this.presets,data.payload.audio_tracks);
+                    }
+                    const default_video=data.payload.streams.filter((item)=>{return item.default})[0].idx;
+                    const default_audio=data.payload.audio_tracks.filter( item => {return item.default})[0].idx;
+                    this.playPreset(default_video,default_audio)
+                }
+
+
+            } catch (e) {
+                console.log(e);
+            }
+        } else if (typeof data === 'object') {
+
+
+            data.arrayBuffer().then((packet) => {
+
+                this.readPacket(packet);
+            })
+            //
+
+
+        }
+    }
+
+    getPresets = () => {
+        return this.presets;
+    }
+
+    playPreset = (videoIdx,audioIdx) => {
+        this.codec = this.presets.filter( (item)=>  item.idx==videoIdx)[0].codecs
+
+        const answer=JSON.stringify({
+            method: 'play', payload: {
+                variant_id: videoIdx,
+                audio_track_id: audioIdx
+            }
+        })
+        this.MSE = new MediaSource();
+        this.video.src = window.URL.createObjectURL(this.MSE);
+        this.MSE.addEventListener('sourceopen', () => {
+            this.MSESourceBuffer = this.MSE.addSourceBuffer(`video/mp4; codecs="${this.codec}"`);
+            this.MSESourceBuffer.mode = "segments";
+            this.MSESourceBuffer.addEventListener("updateend", this.pushPacket);
+            this.webSocket.send(answer);
+        });
+    }
+
+    switchStream = (index) => {
+        this.codec = this.presets[index].codecs;
+        this.webSocket.send(JSON.stringify({
+            method: 'stop'
+        }));
+        this.switchFlag=true;
+        this.webSocket.send(JSON.stringify({
+            method: 'play', payload: {
+                variant_id: this.presets[index].idx
+            }
+        }));
+        this.MSESourceBuffer.timestampOffset = this.MSESourceBuffer.appendWindowStart = this.MSESourceBuffer.buffered.end(this.MSESourceBuffer.buffered.length - 1);
+
+
+    }
+
+    switchAudio = (idx)=>{
+        this.webSocket.send(JSON.stringify({
+            method: 'set_audio_track', payload: {
+                audio_track_id:idx
+            }
+        }));
+        this.video.currentTime+=0.01;
+    }
+
     addMseListeners = () => {
         this.MSE.addEventListener('sourceopen', this.sourceOpenHandler);
     }
 
-    sourceOpenHandler=()=>{
+    sourceOpenHandler = () => {
         this.websocketEvents();
     }
 
-    websocketEvents=()=>{
+    websocketEvents = () => {
         this.webSocket = new WebSocket(this.options.source);
         this.webSocket.binaryType = "arraybuffer";
         this.webSocket.onclose = () => {
-            this.webSocket.onmessage=null;
+            this.webSocket.onmessage = null;
         }
-        this.webSocket.onmessage =  ({data}) => {
-            if(this.codec===null){
-                if(typeof (data)==="object"){
-                    this.codec=new TextDecoder("utf-8").decode((new Uint8Array(data)).slice(1));
-                }else{
-                    this.codec=data;
+        this.webSocket.onmessage = ({data}) => {
+            if (this.codec === null) {
+                if (typeof (data) === "object") {
+                    this.codec = new TextDecoder("utf-8").decode((new Uint8Array(data)).slice(1));
+                } else {
+                    this.codec = data;
                 }
                 this.MSESourceBuffer = this.MSE.addSourceBuffer(`video/mp4; codecs="${this.codec}"`);
                 this.MSESourceBuffer.mode = "segments";
                 this.MSESourceBuffer.addEventListener("updateend", this.pushPacket);
-            }else{
-                if(!this.paused){
+            } else {
+                if (!this.paused) {
                     this.readPacket(data);
                 }
             }
@@ -128,9 +233,22 @@ export default class RTSPtoWEBPlayer{
         }
     }
 
-    readPacket = (packet)=>{
+    readPacket = (packet) => {
+
+
+        if (this.video.buffered && this.video.currentTime > 0) {
+
+            if(typeof this.options.latency === 'function'){
+                this.options.latency(this.video.buffered.length, this.video.buffered.end(this.video.buffered.length - 1), this.video.currentTime)
+            }
+
+            if (this.video.currentTime < this.video.buffered.start(this.video.buffered.length - 1)) {
+                this.video.currentTime = this.video.buffered.end(this.video.buffered.length - 1);
+            }
+        }
         if (!this.MSEStreamingStarted) {
             try {
+
                 this.MSESourceBuffer.appendBuffer(packet);
                 this.MSEStreamingStarted = true;
             } catch (e) {
@@ -157,72 +275,69 @@ export default class RTSPtoWEBPlayer{
         }
     }
 
-    mp4Player=()=>{
-        this.video.src=this.options.source;
+    mp4Player = () => {
+        this.video.src = this.options.source;
     }
 
-    msePlayer =()=>{
+    msePlayer = () => {
         this.MSE = new MediaSource();
         this.video.src = window.URL.createObjectURL(this.MSE);
         this.addMseListeners();
     }
 
-    hlsPlayer = ()=>{
+    hlsPlayer = () => {
         if (this.video.canPlayType('application/vnd.apple.mpegurl')) {
             this.video.src = this.options.source;
         } else if (Hls.isSupported()) {
             this.hls = new Hls(this.options.hlsjsconfig);
             this.hls.loadSource(this.options.source);
             this.hls.attachMedia(this.video);
-        }else{
+        } else {
             console.warn('UNSUPPOERED MEDIA SOURCE');
         }
     }
 
-    webRtcPlayer= async ()=>{
+    webRtcPlayer = async () => {
         this.mediaStream = new MediaStream();
         this.video.srcObject = this.mediaStream;
         this.webrtc = new RTCPeerConnection(this.options.webrtcconfig);
-        this.webrtc.onnegotiationneeded         =this.handleNegotiationNeeded;
-        this.webrtc.onsignalingstatechange      =this.signalingstatechange;
-        this.webrtc.onicegatheringstatechange   =this.icegatheringstatechange;
-        this.webrtc.onicecandidate              =this.icecandidate;
-        this.webrtc.onicecandidateerror         =this.icecandidateerror;
-        this.webrtc.onconnectionstatechange     =this.connectionstatechange;
-        this.webrtc.oniceconnectionstatechange  =this.iceconnectionstatechange;
+        this.webrtc.onnegotiationneeded = this.handleNegotiationNeeded;
+        this.webrtc.onsignalingstatechange = this.signalingstatechange;
+        this.webrtc.onicegatheringstatechange = this.icegatheringstatechange;
+        this.webrtc.onicecandidate = this.icecandidate;
+        this.webrtc.onicecandidateerror = this.icecandidateerror;
+        this.webrtc.onconnectionstatechange = this.connectionstatechange;
+        this.webrtc.oniceconnectionstatechange = this.iceconnectionstatechange;
         this.webrtc.ontrack = this.onTrack;
 
         const offer = await this.webrtc.createOffer({
             //iceRestart:true,
-            offerToReceiveAudio:true,
-            offerToReceiveVideo:true
+            offerToReceiveAudio: true, offerToReceiveVideo: true
         });
         await this.webrtc.setLocalDescription(offer);
     }
 
-    handleNegotiationNeeded = async ()=>{
+    handleNegotiationNeeded = async () => {
         /*
         * in this project this handler is not needed, but in another it can be useful
         */
         this.debugLogger('handleNegotiationNeeded')
     }
 
-    signalingstatechange = async ()=>{
-        switch (this.webrtc.signalingState){
+    signalingstatechange = async () => {
+        switch (this.webrtc.signalingState) {
             case 'have-local-offer':
-                const suuid=((new URL(this.options.source)).pathname).split('/').slice(-1);
+                const suuid = ((new URL(this.options.source)).pathname).split('/').slice(-1);
                 const formData = new FormData();
                 formData.append('data', btoa(this.webrtc.localDescription.sdp));
-                formData.append('suuid',suuid);
-                const response=await  fetch(this.options.source, {
-                    method: 'POST',
-                    body: formData
+                formData.append('suuid', suuid);
+                const response = await fetch(this.options.source, {
+                    method: 'POST', body: formData
                 });
-                if(response.ok){
-                    const remoteDescription=await response.text();
+                if (response.ok) {
+                    const remoteDescription = await response.text();
                     this.webrtc.setRemoteDescription(new RTCSessionDescription({
-                        type: 'answer',
-                        sdp: atob(remoteDescription)
+                        type: 'answer', sdp: atob(remoteDescription)
                     }))
                 }
                 break;
@@ -247,8 +362,8 @@ export default class RTSPtoWEBPlayer{
         }
     }
 
-    icegatheringstatechange =()=>{
-        switch(this.webrtc.iceGatheringState) {
+    icegatheringstatechange = () => {
+        switch (this.webrtc.iceGatheringState) {
             case "gathering":
                 /* collection of candidates has begun */
                 this.debugLogger('collection of candidates has begun');
@@ -260,21 +375,21 @@ export default class RTSPtoWEBPlayer{
         }
     }
 
-    icecandidate = (event)=>{
-        this.debugLogger('icecandidate\n',event);
-        if(!event.candidate){
+    icecandidate = (event) => {
+        this.debugLogger('icecandidate\n', event);
+        if (!event.candidate) {
             //send to signal
             //let candidate=new RTCIceCandidate(event.candidate);
 
         }
     }
 
-    icecandidateerror=(event)=>{
-        this.debugLogger('icecandidateerror\n',`hostCandidate: ${event.hostCandidate} CODE: ${event.errorCode} TEXT: ${event.errorText}`);
+    icecandidateerror = (event) => {
+        this.debugLogger('icecandidateerror\n', `hostCandidate: ${event.hostCandidate} CODE: ${event.errorCode} TEXT: ${event.errorText}`);
     }
 
-    connectionstatechange=()=>{
-        switch(this.webrtc.connectionState) {
+    connectionstatechange = () => {
+        switch (this.webrtc.connectionState) {
             case "new":
             case "connected":
                 this.debugLogger("connected");
@@ -293,17 +408,19 @@ export default class RTSPtoWEBPlayer{
                 break;
         }
     }
-    iceconnectionstatechange=()=>{
-        this.debugLogger('iceconnectionstatechange\n',this.webrtc.iceConnectionState);
+    iceconnectionstatechange = () => {
+        this.debugLogger('iceconnectionstatechange\n', this.webrtc.iceConnectionState);
     }
 
-    onTrack=(event)=>{
-        this.debugLogger('onTrack\n',this.webrtc.iceConnectionState);
+    onTrack = (event) => {
+        this.debugLogger('onTrack\n', this.webrtc.iceConnectionState);
         this.mediaStream.addTrack(event.track);
     }
 
-    destroy=()=>{
-        this.codec=null;
+    destroy = () => {
+        this.codec = null;
+        this.presets = null;
+        this.audio_tracks=null;
         if (this.currentPlayerType != null) {
             switch (this.currentPlayerType) {
                 case 'hls':
@@ -322,12 +439,13 @@ export default class RTSPtoWEBPlayer{
                     break;
 
                 case 'ws':
+                case 'ws-new':
                     this.webSocket.onerror = null;
                     this.webSocket.onopen = null;
                     this.webSocket.onmessage = null;
                     this.webSocket.onclose = null;
                     this.webSocket.close(1000);
-                    this.turn=[];
+                    this.turn = [];
                     break;
                 default:
             }
@@ -337,25 +455,32 @@ export default class RTSPtoWEBPlayer{
         }
     }
 
-    addVideoListeners=()=>{
+    addVideoListeners = () => {
 
         this.video.addEventListener('error', (e) => {
-            this.debugLogger('[ video listener ]',e)
+            this.debugLogger('[ video listener ]', e)
             this.destroy();
         });
 
         this.video.addEventListener('play', () => {
-            this.paused=false
+            this.paused = false
         });
 
         this.video.addEventListener('pause', () => {
-            this.paused=true;
-        });//
+            this.paused = true;
+        });
+
+        this.video.addEventListener('resize', () => {
+            if (typeof this.options.onResolutionChange === 'function') {
+                this.options.onResolutionChange(this.video.videoWidth,this.video.videoHeight);
+            }
+
+        });
 
         this.video.addEventListener('progress', () => {
-            if(this.currentPlayerType === 'ws' && this.video.buffered.length>0){
-                if(this.video.currentTime<this.video.buffered.start(this.video.buffered.length-1)){
-                    this.video.currentTime=this.video.buffered.end(this.video.buffered.length-1)-1;
+            if (this.currentPlayerType === 'ws' && this.video.buffered.length > 0) {
+                if (this.video.currentTime < this.video.buffered.start(this.video.buffered.length - 1)) {
+                    this.video.currentTime = this.video.buffered.end(this.video.buffered.length - 1) - 1;
                 }
             }
         });
@@ -371,7 +496,7 @@ export default class RTSPtoWEBPlayer{
         }
     }
 
-    getImageBase64 = ()=>{
+    getImageBase64 = () => {
         const canvas = document.createElement("canvas");
         canvas.width = this.video.videoWidth;
         canvas.height = this.video.videoHeight;
@@ -381,12 +506,12 @@ export default class RTSPtoWEBPlayer{
         return dataURL;
     }
 
-    debugLogger=(...arg)=>{
-        if(this.options.debug){
-            if(this.options.debug==='trace'){
+    debugLogger = (...arg) => {
+        if (this.options.debug) {
+            if (this.options.debug === 'trace') {
                 console.trace(...arg)
-            }else{
-                console.log(new Date().toLocaleTimeString(),...arg)
+            } else {
+                console.log(new Date().toLocaleTimeString(), ...arg)
             }
 
         }

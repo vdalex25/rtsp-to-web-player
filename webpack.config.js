@@ -1,3 +1,5 @@
+const path = require('path');
+
 module.exports = {
     mode: 'production',//production,development
     watch: false,
@@ -30,5 +32,12 @@ module.exports = {
                 test: /\.css$/,
                 use: ['style-loader', 'css-loader']
             }]
+    },
+    devServer: {
+        static: {
+            directory: path.join(__dirname, 'dist'),
+        },
+        compress: true,
+        port: 9000,
     },
 };

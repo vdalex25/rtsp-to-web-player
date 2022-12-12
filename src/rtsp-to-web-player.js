@@ -494,6 +494,12 @@ export default class RTSPtoWEBPlayer {
                     this.webRtcSocket.onclose = null;
                     this.webRtcSocket.close(1000);
                     this.turn = [];
+                    if (this.webrtc != null) {
+                        this.webrtc.close();
+                        this.webrtc = null;
+                        this.video.srcObject = null;
+                        this.mediaStream = null;
+                    }
                     break;
                 default:
             }

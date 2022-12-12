@@ -94,7 +94,7 @@ export default class RTSPtoWEBPlayer {
             if(this.options.source.indexOf('webrtc')!== -1){
                 this.currentPlayerType = "ws-rtc";
                 this.webRtcOverSocket()
-            }else if (this.options.source.indexOf('on-air') !== -1 || this.options.source.indexOf('preview')) {
+            }else if (this.options.source.indexOf('on-air') !== -1 || this.options.source.indexOf('preview')!== -1) {
                 this.currentPlayerType = "ws-new";
                 this.newMsePlayer();
 

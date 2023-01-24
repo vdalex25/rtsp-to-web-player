@@ -159,12 +159,18 @@ export default class RTSPtoWEBPlayer {
           if (typeof this.options.getPresets === "function") {
             this.options.getPresets(this.presets, data.payload.audio_tracks);
           }
-          const default_video = data.payload.streams.filter((item) => {
+
+          const arr_video = data.payload.streams.filter((item) => {
             return item.default;
-          })[0].idx || data.payload.streams[0].idx;
-          const default_audio = data.payload.audio_tracks.filter((item) => {
+          });
+
+          const arr_audio = data.payload.audio_tracks.filter((item) => {
             return item.default;
-          })[0].idx;
+          });
+
+          const default_video = arr_video.length>0? arr_video[0].idx:data.payload.streams[0].idx;
+          const default_audio = arr_audio.length>0? arr_audio[0].idx:data.payload.audio_tracks[0].idx;
+
           this.playPreset(default_video, default_audio);
         }
       } catch (e) {

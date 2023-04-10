@@ -17,6 +17,9 @@ export default class RTSPtoWEBPlayer {
     presets = null;
     audio_tracks = null;
     switchFlag = false;
+    user_state = {
+        paused:false,
+    };
     options = {
         parentElement: null,
         source: null,
@@ -135,9 +138,6 @@ export default class RTSPtoWEBPlayer {
     webRtcSocketMessageHandler = (data) => {
         data = JSON.parse(data);
         switch (data.method) {
-            case 'play_response':
-
-                break;
             case 'meta_response':
                 this.presets = data.payload.streams;
                 if (typeof this.options.getPresets === "function") {
@@ -151,11 +151,11 @@ export default class RTSPtoWEBPlayer {
                 });
                 const default_video = arr_video.length > 0 ? arr_video[0].idx : data.payload.streams[0].idx;
                 const default_audio = arr_audio.length > 0 ? arr_audio[0].idx : data.payload.audio_tracks[0].idx;
-                this.webRtcSocket.send(JSON.stringify({
-                    method: "play", payload: {
-                        variant_id: default_video,
-                    },
-                }));
+
+                this.user_state.video_track_id=default_video;
+                this.user_state.audio_track_id=default_audio;
+                //создаем локальный оффер
+                this.webRtcSocketOffer();
                 break;
             case 'offer':
                 this.webrtc.setRemoteDescription(new RTCSessionDescription(data.payload));
@@ -163,11 +163,22 @@ export default class RTSPtoWEBPlayer {
             case 'ice_candidate':
                 this.webrtc.addIceCandidate(data.payload);
                 break;
+            case 'answer':
+                this.webrtc.setRemoteDescription(new RTCSessionDescription(data.payload));
+                break
             default:
                 console.warn("unsupported method", data.method);
                 return;
         }
     };
+
+    webRtcSocketOffer = async ()=>{
+        const offer = await this.webrtc.createOffer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: true,
+        });
+        await this.webrtc.setLocalDescription(offer);
+    }
 
     messageHandlerMSE = (data) => {
         if (typeof data === "string") {
@@ -191,6 +202,9 @@ export default class RTSPtoWEBPlayer {
                         });
                         const default_video = arr_video.length > 0 ? arr_video[0].idx : data.payload.streams[0].idx;
                         const default_audio = arr_audio.length > 0 ? arr_audio[0].idx : data.payload.audio_tracks[0].idx;
+
+                        this.user_state.video_track_id=default_video;
+                        this.user_state.audio_track_id=default_audio;
 
                         this.playPresetMSE(default_video, default_audio);
                         break;
@@ -222,9 +236,7 @@ export default class RTSPtoWEBPlayer {
     playPresetMSE = (videoIdx, audioIdx) => {
         this.codec = this.presets.filter((item) => item.idx === videoIdx)[0].codecs;
         const answer = JSON.stringify({
-            method: "play", payload: {
-                variant_id: videoIdx, audio_track_id: audioIdx,
-            },
+            method: "user_state", payload: this.user_state,
         });
         this.MSE = new MediaSource();
         this.video.src = window.URL.createObjectURL(this.MSE);
@@ -238,32 +250,36 @@ export default class RTSPtoWEBPlayer {
 
     switchStream = (index) => {
         this.codec = this.presets[index].codecs;
+        this.user_state.video_track_id=this.presets[index].idx;
         if (this.webRtcSocket) {
+
             this.webRtcSocket.send(JSON.stringify({
-                method: "play", payload: {
-                    variant_id: this.presets[index].idx,
-                },
+                method: "user_state", payload: this.user_state,
             }));
         } else {
             this.switchFlag = true;
             this.webSocket.send(JSON.stringify({
-                method: "play", payload: {
-                    variant_id: this.presets[index].idx,
-                },
+                method: "user_state", payload: this.user_state,
             }));
             this.MSESourceBuffer.timestampOffset = this.MSESourceBuffer.appendWindowStart = this.MSESourceBuffer.buffered.end(this.MSESourceBuffer.buffered.length - 1);
         }
-
-
     };
 
     switchAudio = (idx) => {
-        this.webSocket.send(JSON.stringify({
-            method: "set_audio_track", payload: {
-                audio_track_id: idx,
-            },
-        }));
-        this.video.currentTime += 0.01;
+        this.user_state.audio_track_id=idx;
+        if (this.webRtcSocket) {
+            this.webRtcSocket.send(JSON.stringify({
+                method: "user_state", payload: this.user_state,
+            }));
+        }else{
+            this.webSocket.send(JSON.stringify({
+                method: "set_audio_track", payload: {
+                    audio_track_id: idx,
+                },
+            }));
+            this.video.currentTime += 0.01;
+        }
+
     };
 
     addMseListeners = () => {
@@ -378,7 +394,8 @@ export default class RTSPtoWEBPlayer {
          * for older schema initiate connection create local description
          */
             const offer = await this.webrtc.createOffer({
-                offerToReceiveAudio: true, offerToReceiveVideo: true,
+                offerToReceiveAudio: false,
+                offerToReceiveVideo: true,
             });
             await this.webrtc.setLocalDescription(offer);
         }
@@ -390,20 +407,33 @@ export default class RTSPtoWEBPlayer {
          * in this project this handler is not needed, but in another it can be useful
          */
         this.debugLogger("handleNegotiationNeeded");
+        if (this.webRtcSocket)  {
+            const offer = await this.webrtc.createOffer({
+                offerToReceiveAudio: false, offerToReceiveVideo: true,
+            });
+            await this.webrtc.setLocalDescription(offer);
+        }
     };
 
     signalingstatechange = async () => {
         switch (this.webrtc.signalingState) {
             case "have-remote-offer":
+                this.debugLogger('this.webrtc.signalingState====>[have-remote-offer]')
                 if (this.webRtcSocket) {
                     const answer = await this.webrtc.createAnswer();
                     await this.webrtc.setLocalDescription(answer);
+
                     this.webRtcSocket.send(JSON.stringify({
-                        method: "answer", payload: answer,
+                        method: "answer",
+                        payload: {
+                            sdp:answer,
+                            user_state: this.user_state
+                        },
                     }));
                 }
                 break;
             case "have-local-offer":
+                this.debugLogger('this.webrtc.signalingState====>[have-local-offer]')
                 if (!this.webRtcSocket)  {
                     const suuid = new URL(this.options.source).pathname
                         .split("/")
@@ -420,6 +450,14 @@ export default class RTSPtoWEBPlayer {
                             type: "answer", sdp: atob(remoteDescription),
                         }));
                     }
+                }else{
+
+                    this.webRtcSocket.send(JSON.stringify({
+                        method: "offer", payload: {
+                            user_state: this.user_state,
+                            sdp: this.webrtc.localDescription,
+                        },
+                    }));
                 }
 
                 break;
@@ -429,12 +467,14 @@ export default class RTSPtoWEBPlayer {
                  * This may mean that the RTCPeerConnection object is new, in which case both the localDescription and remoteDescription are null;
                  * it may also mean that negotiation is complete and a connection has been established.
                  */
+                this.debugLogger('this.webrtc.signalingState====>[stable]')
                 break;
 
             case "closed":
                 /*
                  * The RTCPeerConnection has been closed.
                  */
+                this.debugLogger('this.webrtc.signalingState====>[closed]')
                 this.destroy();
                 break;
 
@@ -499,10 +539,13 @@ export default class RTSPtoWEBPlayer {
     };
 
     onTrack = (event) => {
-        this.debugLogger("onTrack\n", this.webrtc.iceConnectionState);
+        this.debugLogger("onTrack\n");
         //make sure there is only one video track in  mediaStream
         if (event.track.kind === 'video' && this.mediaStream.getVideoTracks().length > 0) {
             this.mediaStream.removeTrack(this.mediaStream.getVideoTracks()[0]);
+        }
+        if (event.track.kind === 'audio' && this.mediaStream.getAudioTracks().length > 0) {
+            this.mediaStream.removeTrack(this.mediaStream.getAudioTracks()[0]);
         }
         this.mediaStream.addTrack(event.track);
     };

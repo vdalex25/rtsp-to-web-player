@@ -46,7 +46,37 @@ player.load(
   "ws://localhost:8083/stream/517fe9dbf4b244aaa0330cf582de9932/channel/0/mse?uuid=517fe9dbf4b244aaa0330cf582de9932&channel=0"
 );
 ```
+## Usage multiple players
 
+Add script to your page
+
+```html
+<script src="dist/RTSPtoWEBPlayer.js"></script>
+```
+create containers for players
+```html
+<div id="player-1"></div>
+<div id="player-2"></div>
+<div id="player-3"></div>
+<div id="player-4"></div>
+```
+Create players
+
+```js
+const players = {
+  "firstPlayer":  new RTSPtoWEBPlayer({parentElement: document.getElementById("player-1")}),
+  "secondPlayer": new RTSPtoWEBPlayer({parentElement: document.getElementById("player-2")}),
+  "thirdPlayer":  new RTSPtoWEBPlayer({parentElement: document.getElementById("player-3")}),
+  "fourthPlayer": new RTSPtoWEBPlayer({parentElement: document.getElementById("player-4")})
+}
+//play in first and fourth players
+players.firstPlayer.load(
+  "ws://localhost:8083/stream/517fe9dbf4b244aaa0330cf582de9932/channel/0/mse?uuid=517fe9dbf4b244aaa0330cf582de9932&channel=0"
+);
+players.fourthPlayer.load(
+  "ws://localhost:8083/stream/517fe9dbf4b244aaa0330cf582de9932/channel/0/mse?uuid=517fe9dbf4b244aaa0330cf582de9932&channel=0"
+);
+```
 ## Options
 
 ```js

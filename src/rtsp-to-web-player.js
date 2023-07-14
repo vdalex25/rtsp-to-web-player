@@ -305,6 +305,7 @@ export default class RTSPtoWEBPlayer {
                 }
                 this.MSESourceBuffer = this.MSE.addSourceBuffer(`video/mp4; codecs="${this.codec}"`);
                 this.MSESourceBuffer.mode = "segments";
+                this.MSE.duration = Infinity
                 this.MSESourceBuffer.addEventListener("updateend", this.pushPacket);
             } else {
                 if (!this.paused) {

@@ -630,6 +630,14 @@ export default class RTSPtoWEBPlayer {
                 }
             }
         });
+
+        this.video.addEventListener("canplay", () => {
+            if (this.currentPlayerType === "ws") {
+               if(this.video.paused && this.video.autoplay){
+                   this.video.play();
+               }
+            }
+        });
     };
 
     defDocumentHidden() {

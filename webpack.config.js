@@ -1,7 +1,7 @@
 const path = require("path");
 
 module.exports = {
-  mode: "production", //production,development
+  mode: "development", //production,development
   watch: false,
   target: "web",
   entry: {

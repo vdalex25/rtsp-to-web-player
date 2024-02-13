@@ -31,7 +31,10 @@
 
     const options = {
         parentElement: document.getElementById('player'),
-        debug: true
+        debug: true,
+        onWsClose: (code,reason)=>{
+            console.log(code,reason);
+        },
     };
     const player = new RTSPtoWEBPlayer(options);
     const play = () => {

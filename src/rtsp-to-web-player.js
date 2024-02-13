@@ -43,6 +43,7 @@ export default class RTSPtoWEBPlayer {
 		getPresets: null,
 		onResolutionChange: null,
 		latency: null,
+		onWsClose: null,
 	};
 
 	constructor(options) {
@@ -117,6 +118,9 @@ export default class RTSPtoWEBPlayer {
 		this.webSocket = new WebSocket(this.options.source);
 
 		this.webSocket.onclose = e => {
+			if (typeof this.options.onWsClose === 'function') {
+				this.options.onWsClose(e.code, e.reason);
+			}
 			this.debugLogger(e);
 		};
 
@@ -133,6 +137,9 @@ export default class RTSPtoWEBPlayer {
 		this.webRtcSocket.onclose = e => {
 			this.debugLogger(e);
 			this.webRtcSocket.onmessage = null;
+			if (typeof this.options.onWsClose === 'function') {
+				this.options.onWsClose(e.code, e.reason);
+			}
 		};
 		this.webRtcSocket.onerror = e => {
 			this.debugLogger(e);
@@ -312,8 +319,11 @@ export default class RTSPtoWEBPlayer {
 	websocketEvents = () => {
 		this.webSocket = new WebSocket(this.options.source);
 		this.webSocket.binaryType = 'arraybuffer';
-		this.webSocket.onclose = () => {
+		this.webSocket.onclose = e => {
 			this.webSocket.onmessage = null;
+			if (typeof this.options.onWsClose === 'function') {
+				this.options.onWsClose(e.code, e.reason);
+			}
 		};
 		this.webSocket.onmessage = ({data}) => {
 			if (this.codec === null) {

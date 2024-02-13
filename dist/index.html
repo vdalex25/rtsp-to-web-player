@@ -35,6 +35,9 @@
         parentElement: document.getElementById('player'),
         autoplay: true,
         debug: true,
+        onWsClose: (code,reason)=>{
+            console.log(code,reason);
+        },
         getPresets: (video, audio) => {
             document.getElementById("control").innerHTML = '';
             for (let i = 0; i < video.length; i++) {

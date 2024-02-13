@@ -144,6 +144,26 @@ iceTransportPolicy: "all"//for option "relay" need use  turn server
 
 full list of config you can see on [RTCPeerConnection](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/RTCPeerConnection#parameters)
 
+#### `onWsClose`
+default: null; 
+
+handle websocket close event
+
+example: 
+```js
+onWsClose: (code, reason)=>{
+    switch (code){
+        case 1000:
+        case 1006:
+            //reconect to socket
+            player.load(source);
+            break;
+        default:
+            player.destroy();
+    }
+}
+```
+
 ## Methods
 
 #### `load(source)`

@@ -326,21 +326,30 @@ export default class RTSPtoWEBPlayer {
 			}
 		};
 		this.webSocket.onmessage = ({data}) => {
-			if (this.codec === null) {
-				if (typeof data === 'object') {
+			if (typeof data === 'object') {
+				if (this.codec === null) {
 					this.codec = new TextDecoder('utf-8').decode(new Uint8Array(data).slice(1));
+					this.MSESourceBuffer = this.MSE.addSourceBuffer(`video/mp4; codecs="${this.codec}"`);
+					this.MSESourceBuffer.mode = 'segments';
+					this.MSE.duration = Infinity;
+					this.MSESourceBuffer.addEventListener('updateend', this.pushPacket);
+				} else {
+					if (!this.paused) {
+						this.readPacket(data);
+					}
+				}
+			} else {
+				if (this.codec !== null) {
+					console.log(data);
 				} else {
 					this.codec = data;
-				}
-				this.MSESourceBuffer = this.MSE.addSourceBuffer(`video/mp4; codecs="${this.codec}"`);
-				this.MSESourceBuffer.mode = 'segments';
-				this.MSE.duration = Infinity;
-				this.MSESourceBuffer.addEventListener('updateend', this.pushPacket);
-			} else {
-				if (!this.paused) {
-					this.readPacket(data);
+					this.MSESourceBuffer = this.MSE.addSourceBuffer(`video/mp4; codecs="${this.codec}"`);
+					this.MSESourceBuffer.mode = 'segments';
+					this.MSE.duration = Infinity;
+					this.MSESourceBuffer.addEventListener('updateend', this.pushPacket);
 				}
 			}
+
 			if (document[this.hidden] && this.video.buffered.length) {
 				this.video.currentTime = this.video.buffered.end(this.video.buffered.length - 1) - 1;
 			}

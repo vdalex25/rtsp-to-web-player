@@ -329,7 +329,13 @@ export default class RTSPtoWEBPlayer {
 			if (typeof data === 'object') {
 				if (this.codec === null) {
 					this.codec = new TextDecoder('utf-8').decode(new Uint8Array(data).slice(1));
-					this.MSESourceBuffer = this.MSE.addSourceBuffer(`video/mp4; codecs="${this.codec}"`);
+					const mimeCodec = 'video/mp4; codecs="' + this.codec + '"';
+					if(!this.mseIsTypeSupported(mimeCodec)){
+						console.warn('No decoders for requested formats: '+mimeCodec);
+						this.webSocket.close(1000);
+						return;
+					}
+					this.MSESourceBuffer = this.MSE.addSourceBuffer(mimeCodec);
 					this.MSESourceBuffer.mode = 'segments';
 					this.MSE.duration = Infinity;
 					this.MSESourceBuffer.addEventListener('updateend', this.pushPacket);
@@ -340,7 +346,7 @@ export default class RTSPtoWEBPlayer {
 				}
 			} else {
 				if (this.codec !== null) {
-					console.log(data);
+					//console.log(data);
 				} else {
 					this.codec = data;
 					this.MSESourceBuffer = this.MSE.addSourceBuffer(`video/mp4; codecs="${this.codec}"`);
@@ -403,7 +409,7 @@ export default class RTSPtoWEBPlayer {
 	};
 
 	msePlayer = () => {
-		this.MSE = new MediaSource();
+		this.MSE = this.getMediaSource();
 		this.video.src = window.URL.createObjectURL(this.MSE);
 		this.addMseListeners();
 	};
@@ -413,6 +419,14 @@ export default class RTSPtoWEBPlayer {
 			this.video.src = this.options.source;
 		} else if (Hls.isSupported()) {
 			this.hls = new Hls(this.options.hlsjsconfig);
+			this.hls.on(Hls.Events.ERROR, function (event, data) {
+				if(data?.error?.name === 'NotSupportedError'){
+					console.warn('No decoders for requested formats: '+data?.mimeType);
+				}
+				if(data.details==='levelEmptyError'){
+					console.warn(data.reason);
+				}
+			})
 			this.hls.loadSource(this.options.source);
 			this.hls.attachMedia(this.video);
 		} else {
@@ -443,6 +457,20 @@ export default class RTSPtoWEBPlayer {
 			await this.webrtc.setLocalDescription(offer);
 		}
 	};
+
+	getMediaSource = () => {
+		if (window.ManagedMediaSource) {
+			this.video.disableRemotePlayback = true;
+			return new window.ManagedMediaSource();
+		}
+		if (window.MediaSource) {
+			return new window.MediaSource();
+		}
+	}
+
+	mseIsTypeSupported = function(mimeCodec) {
+		return ('MediaSource' in window && MediaSource.isTypeSupported(mimeCodec))||('ManagedMediaSource' in window && window.ManagedMediaSource.isTypeSupported(mimeCodec))
+	}
 
 	handleNegotiationNeeded = async e => {
 		/*
@@ -568,7 +596,6 @@ export default class RTSPtoWEBPlayer {
 	};
 
 	connectionstatechange = e => {
-		//console.log(e)
 		switch (this.webrtc.connectionState) {
 			case 'new':
 			case 'connected':
